@@ -1,0 +1,19 @@
+{
+  "name": "event-management-system",
+  "version": "1.0.0",
+  "description": "An Event Management System where an admin can create multiple profiles and manage events across multiple users and timezones. where users can view, update, and create events, respecting their selected timezone.",
+  "license": "ISC",
+  "author": "Shyam Pareek",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "dev": "node --watch index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "mongoose": "^9.9.2"
+  }
+}
