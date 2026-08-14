@@ -4,9 +4,8 @@ import {
   getEvents,
   createEvent,
   updateEvent,
+  getEventLogs
 } from "../controllers/eventController.js";
-
-import { getEventLogs } from "../controllers/eventLogController.js";
 
 const router = express.Router();
 

@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { ALLOWED_TIMEZONES } from "../utils/timezones.js";
 
 const ProfileSchema = new mongoose.Schema(
   {
@@ -10,7 +11,8 @@ const ProfileSchema = new mongoose.Schema(
     },
     timezone: {
       type: String,
-      default: "UTC",
+      required: true,
+      enum: ALLOWED_TIMEZONES
     },
   },
   { timestamps: true },

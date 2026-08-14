@@ -1,4 +1,5 @@
 import dayjs from "dayjs";
+import customParseFormat from "dayjs/plugin/customParseFormat.js";
 
 import Event from "../models/Event.js";
 import EventLog from "../models/EventLog.js";
@@ -7,38 +8,94 @@ import Profile from "../models/Profile.js";
 import { fromUtc, toUtc } from "../utils/time.js";
 import { ALLOWED_TIMEZONES } from "../utils/timezones.js";
 
+dayjs.extend(customParseFormat);
+
 const isValidTimezone = (timezone) => {
   return ALLOWED_TIMEZONES.includes(timezone);
 };
 
 const isValidDate = (date) => {
-  return date !== undefined && date !== null && dayjs(date).isValid();
+  if (typeof date !== "string") {
+    return false;
+  }
+
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(date)) {
+    return false;
+  }
+
+  return dayjs(date, "YYYY-MM-DDTHH:mm", true).isValid();
 };
 
 const normalizeProfileIds = (profiles = []) => {
   return profiles.map((profile) => profile.toString()).sort();
 };
 
-const profilesChanged = (oldProfiles, newProfiles) => {
-  const oldIds = normalizeProfileIds(oldProfiles);
-  const newIds = normalizeProfileIds(newProfiles);
+const hasDuplicateProfiles = (profiles) => {
+  const normalizedProfiles = normalizeProfileIds(profiles);
 
-  return JSON.stringify(oldIds) !== JSON.stringify(newIds);
+  return new Set(normalizedProfiles).size !== normalizedProfiles.length;
+};
+
+const profilesChanged = (oldProfiles, newProfiles) => {
+  return (
+    JSON.stringify(normalizeProfileIds(oldProfiles)) !==
+    JSON.stringify(normalizeProfileIds(newProfiles))
+  );
+};
+
+const hasValidDateRange = (startUtc, endUtc) => {
+  return (
+    !Number.isNaN(startUtc.getTime()) &&
+    !Number.isNaN(endUtc.getTime()) &&
+    endUtc.getTime() >= startUtc.getTime()
+  );
 };
 
 const formatWallClock = (date, timezone) => {
   return fromUtc(date, timezone).format("YYYY-MM-DDTHH:mm");
 };
 
-// Get all events, optionally filtered by profileId
+const validateProfiles = async (profiles) => {
+  if (!Array.isArray(profiles) || profiles.length === 0) {
+    return "At least one profile is required.";
+  }
+
+  if (hasDuplicateProfiles(profiles)) {
+    return "Duplicate profiles are not allowed.";
+  }
+
+  const profileCount = await Profile.countDocuments({
+    _id: { $in: profiles },
+  });
+
+  const uniqueProfileCount = normalizeProfileIds(profiles).length;
+
+  if (profileCount !== uniqueProfileCount) {
+    return "One or more profiles are invalid or do not exist.";
+  }
+
+  return null;
+};
+
+const convertEventTimes = (start, end, timezone) => {
+  const startUtc = toUtc(start, timezone);
+  const endUtc = toUtc(end, timezone);
+
+  if (!hasValidDateRange(startUtc, endUtc)) {
+    return null;
+  }
+
+  return {
+    startUtc,
+    endUtc,
+  };
+};
+
+// GET /api/events
 const getEvents = async (req, res) => {
   const { profileId } = req.query;
 
-  const query = {};
-
-  if (profileId) {
-    query.profiles = profileId;
-  }
+  const query = profileId ? { profiles: profileId } : {};
 
   const events = await Event.find(query)
     .populate("profiles")
@@ -47,57 +104,43 @@ const getEvents = async (req, res) => {
   res.json(events);
 };
 
-// Create a new event
+// POST /api/events
 const createEvent = async (req, res) => {
   const { profiles, timezone, start, end } = req.body;
 
-  if (!Array.isArray(profiles) || profiles.length === 0) {
-    return res.status(400).json({
-      error: "At least one profile is required.",
-    });
-  }
-
-  if (!timezone || !isValidTimezone(timezone)) {
+  if (!isValidTimezone(timezone)) {
     return res.status(400).json({
       error: "Invalid timezone.",
     });
   }
 
+  const profileError = await validateProfiles(profiles);
+
+  if (profileError) {
+    return res.status(400).json({
+      error: profileError,
+    });
+  }
+
   if (!isValidDate(start) || !isValidDate(end)) {
     return res.status(400).json({
-      error: "Invalid start or end date.",
+      error: "Start and end must use YYYY-MM-DDTHH:mm format.",
     });
   }
 
-  const startUtc = toUtc(start, timezone);
-  const endUtc = toUtc(end, timezone);
+  const eventTimes = convertEventTimes(start, end, timezone);
 
-  if (Number.isNaN(startUtc.getTime()) || Number.isNaN(endUtc.getTime())) {
-    return res.status(400).json({
-      error: "Invalid start or end date.",
-    });
-  }
-
-  if (endUtc.getTime() < startUtc.getTime()) {
+  if (!eventTimes) {
     return res.status(400).json({
       error: "End date/time must be after or equal to start date/time.",
-    });
-  }
-
-  const nextProfiles = profiles ?? event.profiles;
-  const normalizedProfiles = normalizeProfileIds(nextProfiles);
-
-  if (new Set(normalizedProfiles).size !== normalizedProfiles.length) {
-    return res.status(400).json({
-      error: "Duplicate profiles are not allowed.",
     });
   }
 
   const event = await Event.create({
     profiles,
     timezone,
-    startUtc,
-    endUtc,
+    startUtc: eventTimes.startUtc,
+    endUtc: eventTimes.endUtc,
   });
 
   const populatedEvent = await event.populate("profiles");
@@ -105,7 +148,7 @@ const createEvent = async (req, res) => {
   res.status(201).json(populatedEvent);
 };
 
-// Update an event
+// PATCH /api/events/:id
 const updateEvent = async (req, res) => {
   const { id } = req.params;
   const { profiles, timezone, start, end } = req.body;
@@ -127,17 +170,11 @@ const updateEvent = async (req, res) => {
     });
   }
 
-  if (!Array.isArray(nextProfiles) || nextProfiles.length === 0) {
-    return res.status(400).json({
-      error: "At least one profile is required.",
-    });
-  }
+  const profileError = await validateProfiles(nextProfiles);
 
-  const normalizedProfiles = normalizeProfileIds(nextProfiles);
-
-  if (new Set(normalizedProfiles).size !== normalizedProfiles.length) {
+  if (profileError) {
     return res.status(400).json({
-      error: "Duplicate profiles are not allowed.",
+      error: profileError,
     });
   }
 
@@ -146,14 +183,14 @@ const updateEvent = async (req, res) => {
 
   const hasStartUpdate = start !== undefined;
   const hasEndUpdate = end !== undefined;
-  const timezoneChanged = timezone !== undefined;
+  const hasTimezoneUpdate = timezone !== undefined;
 
   const hasDateOrTimezoneUpdate =
-    hasStartUpdate || hasEndUpdate || timezoneChanged;
+    hasStartUpdate || hasEndUpdate || hasTimezoneUpdate;
 
   if (hasDateOrTimezoneUpdate) {
-    let startWallClock;
-    let endWallClock;
+    let nextStartWallClock;
+    let nextEndWallClock;
 
     if (hasStartUpdate) {
       if (!isValidDate(start)) {
@@ -162,9 +199,9 @@ const updateEvent = async (req, res) => {
         });
       }
 
-      startWallClock = start;
+      nextStartWallClock = start;
     } else {
-      startWallClock = formatWallClock(event.startUtc, event.timezone);
+      nextStartWallClock = formatWallClock(event.startUtc, event.timezone);
     }
 
     if (hasEndUpdate) {
@@ -174,28 +211,25 @@ const updateEvent = async (req, res) => {
         });
       }
 
-      endWallClock = end;
+      nextEndWallClock = end;
     } else {
-      endWallClock = formatWallClock(event.endUtc, event.timezone);
+      nextEndWallClock = formatWallClock(event.endUtc, event.timezone);
     }
 
-    nextStartUtc = toUtc(startWallClock, nextTimezone);
-    nextEndUtc = toUtc(endWallClock, nextTimezone);
+    const eventTimes = convertEventTimes(
+      nextStartWallClock,
+      nextEndWallClock,
+      nextTimezone,
+    );
 
-    if (
-      Number.isNaN(nextStartUtc.getTime()) ||
-      Number.isNaN(nextEndUtc.getTime())
-    ) {
-      return res.status(400).json({
-        error: "Invalid start or end date.",
-      });
-    }
-
-    if (nextEndUtc.getTime() < nextStartUtc.getTime()) {
+    if (!eventTimes) {
       return res.status(400).json({
         error: "End date/time must be after or equal to start date/time.",
       });
     }
+
+    nextStartUtc = eventTimes.startUtc;
+    nextEndUtc = eventTimes.endUtc;
   }
 
   const changes = [];
@@ -252,4 +286,15 @@ const updateEvent = async (req, res) => {
   res.json(populatedEvent);
 };
 
-export { getEvents, createEvent, updateEvent };
+// GET /api/events/:id/logs
+const getEventLogs = async (req, res) => {
+  const { id } = req.params;
+
+  const logs = await EventLog.find({
+    eventId: id,
+  }).sort({ changedAt: -1 });
+
+  res.json(logs);
+};
+
+export { getEvents, createEvent, updateEvent, getEventLogs };
