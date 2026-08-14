@@ -2,12 +2,22 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import connectDB from './db/connect.js';
+import profileRoutes from "./routes/profiles.js";
+import eventRoutes from "./routes/events.js";
+import notFound from './middleware/notFound.js';
+import errorHandler from './middleware/errorHandler.js';
 
 const app = express();
 
 app.use(express.json());
 
 app.use(cors({ origin: process.env.CLIENT_ORIGIN }));
+
+app.use("/api/profiles", profileRoutes);
+app.use("/api/events", eventRoutes);
+
+app.use("/api", notFound)
+app.use(errorHandler);
 
 const startServer = async () => {
     try {
