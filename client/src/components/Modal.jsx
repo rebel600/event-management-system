@@ -1,41 +1,56 @@
-import { getEventLogs } from "../lib/api.js";
+import { useEffect } from "react";
 
-const createLogSlice = (set) => ({
-  eventLogs: [],
-  logsLoading: false,
-  logsError: null,
+function Modal({ title, onClose, wide, children }) {
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
 
-  fetchEventLogs: async (eventId) => {
-    set({
-      logsLoading: true,
-      logsError: null,
-    });
+    document.addEventListener("keydown", handleKeyDown);
 
-    try {
-      const eventLogs = await getEventLogs(eventId);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [onClose]);
 
-      set({
-        eventLogs,
-        logsLoading: false,
-      });
-
-      return eventLogs;
-    } catch (error) {
-      set({
-        logsLoading: false,
-        logsError: error.message,
-      });
-
-      throw error;
+  // Clicking the backdrop closes, but clicks inside the panel must not
+  // bubble up and close it too.
+  const handleBackdropClick = (event) => {
+    if (event.target === event.currentTarget) {
+      onClose();
     }
-  },
+  };
 
-  clearEventLogs: () => {
-    set({
-      eventLogs: [],
-      logsError: null,
-    });
-  },
-});
+  return (
+    <div
+      className="modal-backdrop"
+      onClick={handleBackdropClick}
+    >
+      <div
+        className={`modal ${wide ? "modal-wide" : ""}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+      >
+        <div className="modal-header">
+          <h2>{title}</h2>
 
-export default createLogSlice;
+          <button
+            type="button"
+            className="icon-button"
+            onClick={onClose}
+            aria-label="Close"
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="modal-body">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+export default Modal;

@@ -36,11 +36,7 @@ function formatLogValue(field, value, profiles, viewerTimezone) {
   return String(value);
 }
 
-function EventLogsModal({
-  event,
-  viewerTimezone,
-  onClose,
-}) {
+function EventLogsModal({ viewerTimezone, onClose }) {
   const logs = useStore((state) => state.eventLogs);
   const logsLoading = useStore(
     (state) => state.logsLoading,
@@ -83,7 +79,7 @@ function EventLogsModal({
               </div>
 
               <div className="log-changes">
-                {log.changes.map((change, index) => (
+                {(log.changes || []).map((change, index) => (
                   <div
                     className="log-change"
                     key={`${log._id}-${change.field}-${index}`}

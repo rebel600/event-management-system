@@ -4,7 +4,7 @@ import {
   updateEvent as updateEventApi,
 } from "../lib/api.js";
 
-const createEventSlice = (set, get) => ({
+const createEventSlice = (set) => ({
   events: [],
   eventsLoading: false,
   eventsError: null,

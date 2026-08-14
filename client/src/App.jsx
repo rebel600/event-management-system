@@ -211,7 +211,6 @@ function App() {
 
       {logsEvent && (
         <EventLogsModal
-          event={logsEvent}
           viewerTimezone={viewerTimezone}
           onClose={() => setLogsEvent(null)}
         />
