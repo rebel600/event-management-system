@@ -1,9 +1,16 @@
 import { useState } from "react";
 
 import Modal from "./Modal.jsx";
+import ProfileSelect from "./ProfileSelect.jsx";
+import Select from "./Select.jsx";
 import { formatWallClock } from "../../helper/time.js";
 import { TIMEZONES } from "../../helper/timezones.js";
 import useStore from "../store/index.js";
+
+const TIMEZONE_OPTIONS = TIMEZONES.map((timezone) => ({
+  value: timezone.value,
+  label: timezone.label,
+}));
 
 function EditEventModal({ event, onClose }) {
   const updateEvent = useStore((state) => state.updateEvent);
@@ -11,7 +18,6 @@ function EditEventModal({ event, onClose }) {
   const currentProfileId = useStore(
     (state) => state.currentProfileId,
   );
-  const profiles = useStore((state) => state.profiles);
 
   const start = formatWallClock(
     event.startUtc,
@@ -36,26 +42,24 @@ function EditEventModal({ event, onClose }) {
 
   const [error, setError] = useState("");
 
-  const toggleProfile = (profileId) => {
-    setForm((current) => {
-      const exists = current.profiles.includes(profileId);
-
-      return {
-        ...current,
-        profiles: exists
-          ? current.profiles.filter((id) => id !== profileId)
-          : [...current.profiles, profileId],
-      };
-    });
-  };
-
   const handleChange = (event) => {
     const { name, value } = event.target;
 
-    setForm((current) => ({
-      ...current,
-      [name]: value,
-    }));
+    setForm((current) => {
+      const next = { ...current, [name]: value };
+
+      // Moving the start past the end would leave a stale invalid range that
+      // the end picker's min cannot express, so carry the end along with it.
+      if (
+        name === "startDate" &&
+        next.endDate &&
+        next.endDate < next.startDate
+      ) {
+        next.endDate = next.startDate;
+      }
+
+      return next;
+    });
   };
 
   const handleSubmit = async (submitEvent) => {
@@ -82,49 +86,30 @@ function EditEventModal({ event, onClose }) {
         <div className="form-group">
           <label>Profiles</label>
 
-          <div className="profile-list">
-            {profiles.map((profile) => (
-              <label
-                key={profile._id}
-                className={`profile-option ${
-                  form.profiles.includes(profile._id)
-                    ? "selected"
-                    : ""
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  checked={form.profiles.includes(
-                    profile._id,
-                  )}
-                  onChange={() =>
-                    toggleProfile(profile._id)
-                  }
-                />
-
-                <span>{profile.name}</span>
-              </label>
-            ))}
-          </div>
+          <ProfileSelect
+            value={form.profiles}
+            onChange={(profileIds) =>
+              setForm((current) => ({
+                ...current,
+                profiles: profileIds,
+              }))
+            }
+            defaultTimezone={form.timezone}
+          />
         </div>
 
         <div className="form-group">
           <label>Timezone</label>
 
-          <select
-            name="timezone"
+          <Select
             value={form.timezone}
-            onChange={handleChange}
-          >
-            {TIMEZONES.map((timezone) => (
-              <option
-                key={timezone.value}
-                value={timezone.value}
-              >
-                {timezone.label}
-              </option>
-            ))}
-          </select>
+            onChange={(timezone) =>
+              setForm((current) => ({ ...current, timezone }))
+            }
+            options={TIMEZONE_OPTIONS}
+            placeholder="Select timezone"
+            ariaLabel="Event timezone"
+          />
         </div>
 
         <div className="form-row">
@@ -158,6 +143,7 @@ function EditEventModal({ event, onClose }) {
             <input
               type="date"
               name="endDate"
+              min={form.startDate || undefined}
               value={form.endDate}
               onChange={handleChange}
             />

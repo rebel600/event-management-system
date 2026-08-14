@@ -1,7 +1,14 @@
 import { useState } from "react";
 
+import ProfileSelect from "./ProfileSelect.jsx";
+import Select from "./Select.jsx";
 import { TIMEZONES } from "../../helper/timezones.js";
 import useStore from "../store/index.js";
+
+const TIMEZONE_OPTIONS = TIMEZONES.map((timezone) => ({
+  value: timezone.value,
+  label: timezone.label,
+}));
 
 const initialForm = {
   profiles: [],
@@ -13,38 +20,36 @@ const initialForm = {
 };
 
 function CreateEventForm() {
-  const profiles = useStore((state) => state.profiles);
   const addEvent = useStore((state) => state.addEvent);
   const fetchEvents = useStore((state) => state.fetchEvents);
   const currentProfileId = useStore(
     (state) => state.currentProfileId,
   );
-  const eventsLoading = useStore(
-    (state) => state.eventsLoading,
-  );
 
   const [form, setForm] = useState(initialForm);
   const [error, setError] = useState("");
 
+  // Local to this form. The store's eventsLoading is also raised by fetching
+  // the events list, which would make picking a profile read as "Creating...".
+  const [submitting, setSubmitting] = useState(false);
+
   const handleChange = (event) => {
     const { name, value } = event.target;
 
-    setForm((current) => ({
-      ...current,
-      [name]: value,
-    }));
-  };
-
-  const toggleProfile = (profileId) => {
     setForm((current) => {
-      const selected = current.profiles.includes(profileId);
+      const next = { ...current, [name]: value };
 
-      return {
-        ...current,
-        profiles: selected
-          ? current.profiles.filter((id) => id !== profileId)
-          : [...current.profiles, profileId],
-      };
+      // Moving the start past the end would leave a stale invalid range that
+      // the end picker's min cannot express, so carry the end along with it.
+      if (
+        name === "startDate" &&
+        next.endDate &&
+        next.endDate < next.startDate
+      ) {
+        next.endDate = next.startDate;
+      }
+
+      return next;
     });
   };
 
@@ -67,6 +72,8 @@ function CreateEventForm() {
       return;
     }
 
+    setSubmitting(true);
+
     try {
       await addEvent({
         profiles: form.profiles,
@@ -83,6 +90,8 @@ function CreateEventForm() {
       await fetchEvents(currentProfileId);
     } catch (requestError) {
       setError(requestError.message);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -99,35 +108,16 @@ function CreateEventForm() {
         <div className="form-group">
           <label>Profiles</label>
 
-          <div className="profile-list">
-            {profiles.map((profile) => {
-              const checked = form.profiles.includes(
-                profile._id,
-              );
-
-              return (
-                <label
-                  key={profile._id}
-                  className={`profile-option ${
-                    checked ? "selected" : ""
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() =>
-                      toggleProfile(profile._id)
-                    }
-                  />
-
-                  <span>
-                    <strong>{profile.name}</strong>
-                    <small>{profile.timezone}</small>
-                  </span>
-                </label>
-              );
-            })}
-          </div>
+          <ProfileSelect
+            value={form.profiles}
+            onChange={(profileIds) =>
+              setForm((current) => ({
+                ...current,
+                profiles: profileIds,
+              }))
+            }
+            defaultTimezone={form.timezone}
+          />
         </div>
 
         <div className="form-group">
@@ -135,21 +125,15 @@ function CreateEventForm() {
             Event timezone
           </label>
 
-          <select
-            id="event-timezone"
-            name="timezone"
+          <Select
             value={form.timezone}
-            onChange={handleChange}
-          >
-            {TIMEZONES.map((timezone) => (
-              <option
-                key={timezone.value}
-                value={timezone.value}
-              >
-                {timezone.label}
-              </option>
-            ))}
-          </select>
+            onChange={(timezone) =>
+              setForm((current) => ({ ...current, timezone }))
+            }
+            options={TIMEZONE_OPTIONS}
+            placeholder="Select timezone"
+            ariaLabel="Event timezone"
+          />
         </div>
 
         <div className="form-row">
@@ -186,6 +170,7 @@ function CreateEventForm() {
               id="end-date"
               type="date"
               name="endDate"
+              min={form.startDate || undefined}
               value={form.endDate}
               onChange={handleChange}
             />
@@ -209,9 +194,9 @@ function CreateEventForm() {
         <button
           type="submit"
           className="primary-button"
-          disabled={eventsLoading}
+          disabled={submitting}
         >
-          {eventsLoading ? "Creating..." : "Create Event"}
+          {submitting ? "Creating..." : "Create Event"}
         </button>
       </form>
     </section>
