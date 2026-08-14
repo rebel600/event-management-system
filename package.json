@@ -1,0 +1,16 @@
+{
+  "name": "event-management-system-root",
+  "version": "1.0.0",
+  "description": "Build wrapper so the client and server deploy as a single service.",
+  "private": true,
+  "license": "ISC",
+  "author": "Shyam Pareek",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "npm install --prefix client --include=dev && npm run build --prefix client && npm install --prefix server --omit=dev",
+    "start": "npm start --prefix server",
+    "dev": "echo \"Run 'npm run dev' inside client/ and server/ separately.\" && exit 1"
+  }
+}
