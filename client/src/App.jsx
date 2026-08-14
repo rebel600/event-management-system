@@ -1,17 +1,23 @@
 import { useEffect, useState } from "react";
 
-import AddProfileModal from "./components/AddProfileModal.jsx";
 import CreateEventForm from "./components/CreateEventForm.jsx";
 import EditEventModal from "./components/EditEventModal.jsx";
 import EventCard from "./components/EventCard.jsx";
 import EventLogsModal from "./components/EventLogsModal.jsx";
+import ProfileSelect from "./components/ProfileSelect.jsx";
+import Select from "./components/Select.jsx";
 
 import { TIMEZONES } from "../helper/timezones.js";
 import useStore from "./store";
+import { getBrowserTimezone } from "./store/viewerStore.js";
+
+const VIEWER_TIMEZONE_OPTIONS = TIMEZONES.map((timezone) => ({
+  value: timezone.value,
+  label: `View in ${timezone.label}`,
+}));
 
 
 function App() {
-  const profiles = useStore((state) => state.profiles);
   const events = useStore((state) => state.events);
 
   const currentProfileId = useStore(
@@ -20,10 +26,6 @@ function App() {
 
   const viewerTimezone = useStore(
     (state) => state.viewerTimezone,
-  );
-
-  const profilesLoading = useStore(
-    (state) => state.profilesLoading,
   );
 
   const fetchProfiles = useStore(
@@ -54,8 +56,9 @@ function App() {
     (state) => state.clearEventLogs,
   );
 
-  const [showProfileModal, setShowProfileModal] =
-    useState(false);
+  // The select binds to the raw choice so it can sit empty, while everything
+  // that formats a time needs a real zone.
+  const displayTimezone = viewerTimezone || getBrowserTimezone();
 
   const [editingEvent, setEditingEvent] =
     useState(null);
@@ -71,15 +74,7 @@ function App() {
     fetchEvents(currentProfileId);
   }, [currentProfileId, fetchEvents]);
 
-  const handleProfileChange = (event) => {
-    setCurrentProfileId(event.target.value);
-  };
-
-  const handleViewerTimezoneChange = async (
-    event,
-  ) => {
-    const timezone = event.target.value;
-
+  const handleViewerTimezoneChange = async (timezone) => {
     setViewerTimezone(timezone);
 
     if (currentProfileId) {
@@ -116,46 +111,23 @@ function App() {
         </div>
 
         <div className="header-actions">
-          <select
-            value={currentProfileId || ""}
-            onChange={handleProfileChange}
-            disabled={profilesLoading}
-          >
-            <option value="" disabled>
-              Select profile
-            </option>
+          <ProfileSelect
+            mode="single"
+            value={currentProfileId}
+            onChange={setCurrentProfileId}
+            placeholder="Select profile"
+            searchPlaceholder="Search current profile..."
+            defaultTimezone={displayTimezone}
+          />
 
-            {profiles.map((profile) => (
-              <option
-                key={profile._id}
-                value={profile._id}
-              >
-                {profile.name}
-              </option>
-            ))}
-          </select>
-
-          <select
+          <Select
             value={viewerTimezone}
             onChange={handleViewerTimezoneChange}
-          >
-            {TIMEZONES.map((timezone) => (
-              <option
-                key={timezone.value}
-                value={timezone.value}
-              >
-                View in {timezone.label}
-              </option>
-            ))}
-          </select>
+            options={VIEWER_TIMEZONE_OPTIONS}
+            placeholder="Select timezone"
+            ariaLabel="View events in timezone"
+          />
 
-          <button
-            type="button"
-            className="primary-button"
-            onClick={() => setShowProfileModal(true)}
-          >
-            + Add Profile
-          </button>
         </div>
       </header>
 
@@ -184,7 +156,7 @@ function App() {
                 <EventCard
                   key={event._id}
                   event={event}
-                  viewerTimezone={viewerTimezone}
+                  viewerTimezone={displayTimezone}
                   onEdit={setEditingEvent}
                   onLogs={handleLogs}
                 />
@@ -196,15 +168,7 @@ function App() {
         <CreateEventForm />
       </main>
 
-      {showProfileModal && (
-        <AddProfileModal
-          onClose={() => setShowProfileModal(false)}
-        />
-      )}
-
       {editingEvent && (
-        // Keyed so switching events remounts the modal and its form state is
-        // rebuilt from the new event rather than reused.
         <EditEventModal
           key={editingEvent._id}
           event={editingEvent}
@@ -214,7 +178,7 @@ function App() {
 
       {logsEvent && (
         <EventLogsModal
-          viewerTimezone={viewerTimezone}
+          viewerTimezone={displayTimezone}
           onClose={() => setLogsEvent(null)}
         />
       )}
