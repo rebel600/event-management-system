@@ -1,9 +1,16 @@
 import { useState } from "react";
+import dayjs from "dayjs";
 
+import DatePicker from "./DatePicker.jsx";
 import ProfileSelect from "./ProfileSelect.jsx";
 import Select from "./Select.jsx";
+import TimePicker from "./TimePicker.jsx";
 import { TIMEZONES } from "../../helper/timezones.js";
 import useStore from "../store/index.js";
+
+// Read per render, not once at module load, so a tab left open overnight does
+// not keep yesterday's date as the floor.
+const today = () => dayjs().format("YYYY-MM-DD");
 
 const TIMEZONE_OPTIONS = TIMEZONES.map((timezone) => ({
   value: timezone.value,
@@ -33,9 +40,7 @@ function CreateEventForm() {
   // the events list, which would make picking a profile read as "Creating...".
   const [submitting, setSubmitting] = useState(false);
 
-  const handleChange = (event) => {
-    const { name, value } = event.target;
-
+  const setField = (name, value) => {
     setForm((current) => {
       const next = { ...current, [name]: value };
 
@@ -69,6 +74,21 @@ function CreateEventForm() {
       !form.endTime
     ) {
       setError("Start and end date/time are required.");
+      return;
+    }
+
+    if (form.startDate < today()) {
+      setError("An event cannot start in the past.");
+      return;
+    }
+
+    // Compared as wall-clock strings in one timezone, so a plain string
+    // compare is safe here. The server re-checks on the converted instants.
+    if (
+      `${form.endDate}T${form.endTime}` <
+      `${form.startDate}T${form.startTime}`
+    ) {
+      setError("The end must be after the start.");
       return;
     }
 
@@ -138,53 +158,47 @@ function CreateEventForm() {
 
         <div className="form-row">
           <div className="form-group">
-            <label htmlFor="start-date">Start date</label>
+            <label>Start date</label>
 
-            <input
-              id="start-date"
-              type="date"
-              name="startDate"
+            {/* New events cannot start in the past. */}
+            <DatePicker
               value={form.startDate}
-              onChange={handleChange}
+              onChange={(date) => setField("startDate", date)}
+              min={today()}
+              ariaLabel="Start date"
             />
           </div>
 
           <div className="form-group">
-            <label htmlFor="start-time">Start time</label>
+            <label>Start time</label>
 
-            <input
-              id="start-time"
-              type="time"
-              name="startTime"
+            <TimePicker
               value={form.startTime}
-              onChange={handleChange}
+              onChange={(time) => setField("startTime", time)}
+              ariaLabel="Start time"
             />
           </div>
         </div>
 
         <div className="form-row">
           <div className="form-group">
-            <label htmlFor="end-date">End date</label>
+            <label>End date</label>
 
-            <input
-              id="end-date"
-              type="date"
-              name="endDate"
-              min={form.startDate || undefined}
+            <DatePicker
               value={form.endDate}
-              onChange={handleChange}
+              onChange={(date) => setField("endDate", date)}
+              min={form.startDate || today()}
+              ariaLabel="End date"
             />
           </div>
 
           <div className="form-group">
-            <label htmlFor="end-time">End time</label>
+            <label>End time</label>
 
-            <input
-              id="end-time"
-              type="time"
-              name="endTime"
+            <TimePicker
               value={form.endTime}
-              onChange={handleChange}
+              onChange={(time) => setField("endTime", time)}
+              ariaLabel="End time"
             />
           </div>
         </div>
