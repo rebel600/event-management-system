@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import Modal from "./Modal.jsx";
 import { formatWallClock } from "../../helper/time.js";
@@ -24,7 +24,9 @@ function EditEventModal({ event, onClose }) {
   );
 
   const [form, setForm] = useState({
-    profiles: event.profiles.map((profile) => profile._id),
+    profiles: (event.profiles || []).map(
+      (profile) => profile._id,
+    ),
     timezone: event.timezone,
     startDate: start.date,
     startTime: start.time,
@@ -33,29 +35,6 @@ function EditEventModal({ event, onClose }) {
   });
 
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    const currentStart = formatWallClock(
-      event.startUtc,
-      event.timezone,
-    );
-
-    const currentEnd = formatWallClock(
-      event.endUtc,
-      event.timezone,
-    );
-
-    setForm({
-      profiles: event.profiles.map(
-        (profile) => profile._id,
-      ),
-      timezone: event.timezone,
-      startDate: currentStart.date,
-      startTime: currentStart.time,
-      endDate: currentEnd.date,
-      endTime: currentEnd.time,
-    });
-  }, [event]);
 
   const toggleProfile = (profileId) => {
     setForm((current) => {

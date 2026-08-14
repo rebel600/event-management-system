@@ -203,7 +203,10 @@ function App() {
       )}
 
       {editingEvent && (
+        // Keyed so switching events remounts the modal and its form state is
+        // rebuilt from the new event rather than reused.
         <EditEventModal
+          key={editingEvent._id}
           event={editingEvent}
           onClose={() => setEditingEvent(null)}
         />
@@ -211,7 +214,6 @@ function App() {
 
       {logsEvent && (
         <EventLogsModal
-          event={logsEvent}
           viewerTimezone={viewerTimezone}
           onClose={() => setLogsEvent(null)}
         />
