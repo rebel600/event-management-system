@@ -1,4 +1,6 @@
-const API_URL = "/api";
+// In dev this stays "/api" and Vite proxies to the local server.
+// In production set VITE_API_URL to the deployed backend, e.g. https://api.example.com
+const API_URL = `${(import.meta.env.VITE_API_URL || "").replace(/\/$/, "")}/api`;
 
 const request = async (url, options = {}) => {
   const response = await fetch(`${API_URL}${url}`, {

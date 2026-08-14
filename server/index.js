@@ -9,9 +9,21 @@ import errorHandler from './middleware/errorHandler.js';
 
 const app = express();
 
+// Comma-separated list so preview deploys and localhost can share one variable.
+const allowedOrigins = (process.env.CLIENT_ORIGIN || "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
 app.use(express.json());
 
-app.use(cors({ origin: process.env.CLIENT_ORIGIN }));
+app.use(cors({
+    origin: allowedOrigins.length ? allowedOrigins : "*",
+}));
+
+app.get("/health", (req, res) => {
+    res.json({ status: "ok" });
+});
 
 app.use("/api/profiles", profileRoutes);
 app.use("/api/events", eventRoutes);
@@ -19,12 +31,16 @@ app.use("/api/events", eventRoutes);
 app.use("/api", notFound)
 app.use(errorHandler);
 
+// Railway injects PORT at runtime; fall back for local development.
+const PORT = process.env.PORT || 3000;
+
 const startServer = async () => {
     try {
         await connectDB();
 
-        app.listen(process.env.PORT, () => {
-            console.log(`Server is running on port: http://127.0.0.1:${process.env.PORT}`);
+        // Bind 0.0.0.0 so the platform's proxy can reach the container.
+        app.listen(PORT, "0.0.0.0", () => {
+            console.log(`Server is running on port: ${PORT}`);
         });
     } catch (error) {
         console.error('Failed to start server:', error);
