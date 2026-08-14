@@ -1,8 +1,10 @@
 import { useState } from "react";
 
+import DatePicker from "./DatePicker.jsx";
 import Modal from "./Modal.jsx";
 import ProfileSelect from "./ProfileSelect.jsx";
 import Select from "./Select.jsx";
+import TimePicker from "./TimePicker.jsx";
 import { formatWallClock } from "../../helper/time.js";
 import { TIMEZONES } from "../../helper/timezones.js";
 import useStore from "../store/index.js";
@@ -42,9 +44,7 @@ function EditEventModal({ event, onClose }) {
 
   const [error, setError] = useState("");
 
-  const handleChange = (event) => {
-    const { name, value } = event.target;
-
+  const setField = (name, value) => {
     setForm((current) => {
       const next = { ...current, [name]: value };
 
@@ -116,22 +116,22 @@ function EditEventModal({ event, onClose }) {
           <div className="form-group">
             <label>Start date</label>
 
-            <input
-              type="date"
-              name="startDate"
+            {/* No past-date floor here: an existing event may legitimately
+                sit in the past and still need editing. */}
+            <DatePicker
               value={form.startDate}
-              onChange={handleChange}
+              onChange={(date) => setField("startDate", date)}
+              ariaLabel="Start date"
             />
           </div>
 
           <div className="form-group">
             <label>Start time</label>
 
-            <input
-              type="time"
-              name="startTime"
+            <TimePicker
               value={form.startTime}
-              onChange={handleChange}
+              onChange={(time) => setField("startTime", time)}
+              ariaLabel="Start time"
             />
           </div>
         </div>
@@ -140,23 +140,21 @@ function EditEventModal({ event, onClose }) {
           <div className="form-group">
             <label>End date</label>
 
-            <input
-              type="date"
-              name="endDate"
-              min={form.startDate || undefined}
+            <DatePicker
               value={form.endDate}
-              onChange={handleChange}
+              onChange={(date) => setField("endDate", date)}
+              min={form.startDate || undefined}
+              ariaLabel="End date"
             />
           </div>
 
           <div className="form-group">
             <label>End time</label>
 
-            <input
-              type="time"
-              name="endTime"
+            <TimePicker
               value={form.endTime}
-              onChange={handleChange}
+              onChange={(time) => setField("endTime", time)}
+              ariaLabel="End time"
             />
           </div>
         </div>
