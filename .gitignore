@@ -23,3 +23,7 @@ npm-debug.log*
 .DS_Store
 Thumbs.db
 *.local
+
+# Working notes and the assignment brief — kept locally, not published
+PLAN.md
+SkaiLama_Assignment_for_MERN_stack_Developer.md
